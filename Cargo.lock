@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "rmake_reborn"
+name = "rmake"
 version = "0.1.0"
