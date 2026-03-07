@@ -14,8 +14,8 @@ Just keep the license and don't blame me if it eats your cat.
 //  <- Also comment
 ;   <- Also also comment
 
-VERBOSE=y <- Show the stderr & stdout of the [run] section
-EXIT_CODE=y <- Show the exit code of the [run] section
+VERBOSE=y   <- Show the stderr & stdout of [build] or [run] section
+EXIT_CODE=y <- Show the exit code of [build] or [run] section
 
 build 
 {
@@ -23,7 +23,9 @@ build
     flags=-std=c++17 -Wall -Werror -Wextra -ggdb
     src=src/*.cpp
     include=src/include
-    target=progtest.exe
+    lpaths=My/lib/path/lib
+    lflags=mylib opengl32
+    target=progtest.out
 }
 
 run
@@ -45,9 +47,3 @@ rmake run                # run the [run] section (no rebuild)
 rmake watch              # hot-reload on save (WIP)
 rmake help               # this message
 ```
-Why this exists
-I got tired of suffering with Make and CMake for my personal projects.
-So I rewrote my old C nightmare (see `legacy/`) in Rust.
-Now it works, it's fast, and it doesn't make me cry.
-
-*— Remmaker*
