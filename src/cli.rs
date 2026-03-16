@@ -11,7 +11,6 @@ Usage
   rmake                 → build (search for the first ".rm" file in the cwd and execute build section)
   rmake file | file.rm  → build using provided config file
   rmake run             → execute run section (without rebuild)
-  rmake watch           → kind of hot-reload on file save
   rmake help            → show this
 "#);
 }
@@ -53,28 +52,8 @@ pub fn run() -> Result<(), ConfigError>{
         let run_conf = parse_run(&config)?;
         res = execute_run(&run_conf)?;
     }
-    
-    let verbose = config.global.get("verbose").is_some_and(|v| v == "y");
-    let show_exit = config.global.get("exit_code").is_some_and(|v| v == "y");
-    if verbose || show_exit {
-        for elem in res {
-            if verbose{
-                if !elem.stdout.is_empty() {
-                    eprintln!("stdout : {}", elem.stdout);
-                }
-                if !elem.stderr.is_empty() {
-                    eprintln!("stderr : {}", elem.stderr);
-                }
-            }
-            
-            if show_exit {
-                if let Some(c) = elem.status.code() {  
-                    eprintln!("Exit code: {}", c);
-                }
-            }
-        }
-    }
-    
 
+
+    
     Ok(())
 }

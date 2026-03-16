@@ -11,9 +11,6 @@ Just a clean `.rm` file you can read (and edit) in 30 seconds.
 //  <- Also comment
 ;   <- Also also comment
 
-VERBOSE=y   <- Show the stderr & stdout of [build] or [run] section
-EXIT_CODE=y <- Show the exit code of [build] or [run] section
-
 build 
 {
     compiler=g++
@@ -22,7 +19,7 @@ build
     include=src/include
     lpaths=My/lib/path/lib
     lflags=mylib opengl32
-    target=progtest.out
+    target=out.out
 }
 
 run
@@ -41,6 +38,5 @@ run
 rmake                    # build (auto-finds *.rm)
 rmake mygame.rm | mygame # build a specific file
 rmake run                # run the [run] section (no rebuild)
-rmake watch              # hot-reload on save (WIP)
 rmake help               # this message
 ```
