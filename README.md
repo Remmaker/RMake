@@ -5,9 +5,6 @@ A fast, readable, **no-bullshit** build system for personal C/C++ projects.
 No CMakeLists hell. No 500-line Makefiles.  
 Just a clean `.rm` file you can read (and edit) in 30 seconds.
 
-MIT licensed — take it, break it, ship it, sell it, I don't care.  
-Just keep the license and don't blame me if it eats your cat.
-
 ### Example · conf.rm
 ```ini
 #   <- Comment token, no multiline token, just use line by line commentary.
