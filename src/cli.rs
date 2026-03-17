@@ -15,7 +15,7 @@ Usage
 "#);
 }
 
-pub fn run() -> Result<(), ConfigError>{
+pub fn run() -> Result<i32, ConfigError>{
     let rmake_arg: Vec<String> = std::env::args().collect();
     let mut path_build_file: String = String::new();
     let mut should_build = false;
@@ -31,7 +31,7 @@ pub fn run() -> Result<(), ConfigError>{
 
         },
         Some("watch") => { todo!() },
-        Some("help") => { help(); return Ok(()) },
+        Some("help") => { help(); return Ok(0) },
         Some(file) if file_is_conf(file)? => { path_build_file = file.to_string(); should_build = true },
         None => { path_build_file = find_first_rm()?; should_build = true },
         _ => { eprintln!("UNREACHABLE") }
@@ -53,7 +53,17 @@ pub fn run() -> Result<(), ConfigError>{
         res = execute_run(&run_conf)?;
     }
 
-
-    
-    Ok(())
+    // TODO: check for multiple output (scripts for run section)
+    if let Some(v) = res[0].status.code() {
+        if v == 0 {
+            eprintln!("Rmake exited normmally: {}", v);
+            Ok(v)
+        } else {
+            eprintln!("Rmake exited abnormally: {}", v);
+            Ok(v)
+        }
+    } else {
+        eprintln!("Rmake exited abnormally: No reason");
+        Ok(0) // For now
+    }
 }

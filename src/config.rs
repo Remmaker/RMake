@@ -26,7 +26,7 @@ impl std::fmt::Display for ConfigError {
             ConfigError::CommandFailed { cmd, message } => {
                 write!(f, "Failed to execute command {cmd}: {message}")
             },
-        }
+       }
     }
 }
 
