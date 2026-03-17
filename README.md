@@ -1,4 +1,4 @@
-# RMake Reborn
+# RMake 
 
 A fast, readable, **no-bullshit** build system for personal C/C++ projects.
 
