@@ -57,28 +57,31 @@ fn is_comment_line_or_empty(line: &str) -> bool {
     false
 }
 
-pub fn parse_value(conf: &Config, str: &str) -> Result<String, ConfigError> {
-    let mut ret: String = str.to_string();
+pub fn parse_value(conf: &Config, input: &str) -> Result<String, ConfigError> {
+    let mut ret = input.to_string();
 
-    if !ret.contains("${") {
-        return Ok(ret);
-    }
-
-    let mut tmp: String = ret.clone();
-
-    while let Some(target) = tmp.find("${") {
+    while let Some(target) = ret.find("${") {
         let start = target + 2;
-        if let Some(end) = tmp[start+2..].find("}") {
-            let current_var = tmp[start+2..end].to_string();
-            if conf.global.contains_key(&current_var) {
-                ret = ret.replace(&format!("${{{current_var}}}").to_string(), conf.global[&current_var].as_str());
-            }
-            tmp = ret[end..ret.len()].to_string();
-        } else {
-            return Err(ConfigError::InvalidSyntax { line: 0, message: "Missing '}' variadic syntax: (TODO)".into() })
-        }
-    }
 
+        let rest = &ret[start..];
+        let Some(rel_end) = rest.find('}') else {
+            return Err(ConfigError::InvalidSyntax {
+                line: 0,
+                message: "Missing '}' in variable syntax".into(),
+            });
+        };
+
+        let end = start + rel_end;
+        let current_var = &ret[start..end];
+
+        let Some(value) = conf.global.get(current_var) else {
+            return Err(ConfigError::InvalidConfig {
+                message: format!("Unknown variable: {current_var}"),
+            });
+        };
+
+        ret.replace_range(target..=end, value);
+    }
 
     Ok(ret)
 }
@@ -113,14 +116,6 @@ pub fn parse(lines: Vec<&str>) -> Result<Config, ConfigError> {
             continue;
         }
 
-        if line.ends_with("}") {
-            if config.current_section == None {
-                return Err(ConfigError::InvalidSyntax { line: line_number, message: "Standalone closing brace '}', missing section".into()})
-            }
-            config.current_section = None;
-            continue;
-        }
-
         if let Some((key, value)) = line.split_once("=") {
             if let Some(section) = &config.current_section {
                 let parsed_value = parse_value(&config, value)?;
@@ -131,12 +126,22 @@ pub fn parse(lines: Vec<&str>) -> Result<Config, ConfigError> {
             config.global.insert(key.trim().to_string().to_lowercase(), value.trim().to_string());
             continue;
 
-        } else {
+        } else if !line.ends_with("}") {
             if lines[i+1].trim().to_string() != "{" {
                 return Err(ConfigError::InvalidSyntax { line: line_number, message: "Invalid standalone token, missing a '{' or a key=value pair".into()})
             }
             continue;
         }
+
+        if line.ends_with("}") {
+            if config.current_section == None {
+                return Err(ConfigError::InvalidSyntax { line: line_number, message: "Standalone closing brace '}', missing section".into()})
+            }
+            config.current_section = None;
+            continue;
+        }
+
+
     }
     Ok(config)
 }
