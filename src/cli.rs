@@ -42,7 +42,7 @@ pub fn run() -> Result<i32, ConfigError>{
     let lines: Vec<&str> = content.lines().collect();
     let config: Config = parse(lines)?;
 
-    let res: Vec<CmdOutput>;
+    let res: CmdOutput;
     check_for_config_requirement(&config)?;
 
     if should_build {
@@ -53,10 +53,10 @@ pub fn run() -> Result<i32, ConfigError>{
         res = execute_run(&run_conf)?;
     }
 
-    let msgerr: String = res[0].stderr.clone();
-    let msgok: String  = res[0].stdout.clone();
+    let msgerr: String = res.stderr.clone();
+    let msgok: String  = res.stdout.clone();
 
-    if let Some(v) = res[0].status.code() {
+    if let Some(v) = res.status.code() {
         if v == 0 {
             if !msgok.is_empty() {
                 eprintln!("{}", msgok);
@@ -71,7 +71,7 @@ pub fn run() -> Result<i32, ConfigError>{
         }
     } else {
         if !msgerr.is_empty() {
-            eprintln!("{}", res[0].stderr);
+            eprintln!("{}", res.stderr);
         }
         Err(ConfigError::NonZeroExit { code: -1 } )
     }

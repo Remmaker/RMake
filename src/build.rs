@@ -61,7 +61,7 @@ pub fn parse_build(conf: &Config) -> Result<BuildConfig, ConfigError> {
     Ok(build_conf)
 }
 
-pub fn execute_build(conf: &BuildConfig) -> Result<Vec<CmdOutput>, ConfigError> {
+pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
     let compiler = conf.compiler.clone();
     let is_cl = compiler.ends_with("cl") || compiler.ends_with("cl.exe");
 
@@ -100,15 +100,9 @@ pub fn execute_build(conf: &BuildConfig) -> Result<Vec<CmdOutput>, ConfigError> 
     eprintln!("RMake: {}", cmdstr);
     let output = cmd.output()
                     .map_err(|_| ConfigError::CommandFailed { cmd: conf.compiler.clone(), message: "Unexpected".into() })?;
+    let cout: CmdOutput = {
 
-    let mut ret: Vec<CmdOutput> = Vec::new();
-    let tmp: CmdOutput = CmdOutput { 
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(), 
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(), 
-        status: output.status 
-    };
-
-    ret.push(tmp);
-    Ok(ret)
+    }
+    Ok(output)
 }
 
