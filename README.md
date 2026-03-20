@@ -11,6 +11,8 @@ Just a clean `.rm` file you can read (and edit) in 30 seconds.
 //  <- Also comment
 ;   <- Also also comment
 
+myvar=myexe.out
+
 build 
 {
     compiler=g++
@@ -19,12 +21,13 @@ build
     include=src/include
     lpaths=My/lib/path/lib
     lflags=mylib opengl32
-    target=out.out
+    target=${myvar}
 }
 
 run
 {
-    run=progtest.exe
+    target=${myvar}
+    rebuild=t | f | true | false
 }
 ```
 
@@ -32,8 +35,8 @@ run
 
 # Usage 
 ```text
-rmake                    # build (auto-finds *.rm)
-rmake mygame.rm | mygame # build a specific file
-rmake run                # run the [run] section (no rebuild)
+rmake                    # execute build section (auto-find first .rm file)
+rmake mygame.rm | mygame # execute build section on a specific file
+rmake run                # execute run section
 rmake help               # this message
 ```

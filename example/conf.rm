@@ -2,8 +2,8 @@
 //  <- Also a comment token
 ;   <- also also
 
-VERBOSE=y
-EXIT_CODE=y
+myvar=progtest.exe
+rebuild=true
 
 build 
 {
@@ -11,13 +11,11 @@ build
     flags=-std=c++17 -Wall -Werror -Wextra -ggdb
     src=src/*.cpp
     include=src/include
-    target=progtest.exe
+    target=${myvar}
 }
 
 run
 {
-    interpreter=python
-    prescript=pretest.py
-    run=progtest.exe
-    postscript=testpost.py
+    target=${myvar}
+    rebuild=${rebuild}
 }
