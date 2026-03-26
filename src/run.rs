@@ -3,7 +3,9 @@ use crate::config::*;
 #[derive(Default, Debug)]
 pub struct RunConfig {
     target: String,
+    args: Option<String>,
     pub rebuild: bool,
+    
 }
 
 pub fn parse_run(conf: &Config) -> Result<RunConfig, ConfigError> {
@@ -23,6 +25,9 @@ pub fn parse_run(conf: &Config) -> Result<RunConfig, ConfigError> {
                     return Err(ConfigError::InvalidConfig { message: "Only one target is supported at time".into() })
                 }
                 run_conf.target = v.to_string() 
+            },
+            "args" => {
+                run_conf.args = Some(v.to_string())
             },
             "rebuild" => {
                 if v.split_once(" ").is_some() {
@@ -59,8 +64,12 @@ pub fn execute_run(run_conf: &RunConfig) -> Result<CmdOutput, ConfigError> {
             format!("./{}", run_conf.target)
         }
     };
-
+    
+    let mut clonarg = run_conf.args.clone();
+    let args = clonarg.get_or_insert("".into()).split_whitespace().map(|s| s.to_string());
+    
     let cmd = std::process::Command::new(binary)
+        .args(args)
         .output().map_err(|_| ConfigError::CommandFailed { cmd: run_conf.target.clone(), message: "Failed to run target".into() })?;
     let cmdoutput: CmdOutput = CmdOutput { 
         stdout: String::from_utf8_lossy(&cmd.stdout).to_string(),

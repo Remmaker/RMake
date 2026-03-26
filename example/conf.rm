@@ -4,6 +4,7 @@
 
 myvar=progtest.exe
 rebuild=true
+args=test -debug
 
 build 
 {
@@ -18,4 +19,5 @@ run
 {
     target=${myvar}
     rebuild=${rebuild}
+    args=${args}
 }
