@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::fs;
 use crate::config::*;
 
 #[derive(Default, Debug)]
@@ -12,6 +13,30 @@ pub struct BuildConfig {
     target: String
 }
 
+fn parse_glob_src(src: Vec<String>) -> Vec<String> {
+    let mut ret: Vec<String> = Vec::new();
+
+    // TODO: Maybe handle "folder" wildcard too
+    for s in &src {
+        if s.contains('*') {
+            let extension = s.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("cpp");
+            let folder = s.rsplit_once('/').map(|(left, _)| left).unwrap_or(".");
+
+            if let Ok(entries) = fs::read_dir(folder) {
+                let matches = entries
+                    .filter_map(Result::ok)
+                    .map(|e| e.path())
+                    .filter(|p| p.extension().and_then(|e| e.to_str()) == Some(extension))
+                    .filter_map(|p| p.to_str().map(String::from));
+                ret.extend(matches);
+            }
+        } else {
+            ret.push(s.clone());
+        }
+    }
+
+    ret
+}
 
 pub fn parse_build(conf: &Config) -> Result<BuildConfig, ConfigError> {
 
@@ -57,7 +82,9 @@ pub fn parse_build(conf: &Config) -> Result<BuildConfig, ConfigError> {
             }  
         }
     }
-
+    
+    build_conf.src = parse_glob_src(build_conf.src);
+    
     Ok(build_conf)
 }
 
