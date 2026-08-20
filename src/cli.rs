@@ -95,7 +95,11 @@ pub fn run() -> Result<i32, ConfigError>{
     if should_run {
         let run_conf = parse_run(&config)?;
         if run_conf.rebuild {
+            let src_to_build = cache_compute_diff(build_conf.src.clone(), scache.clone(), ccache)?;
+            
+            build_conf.src = src_to_build;
             res_build = execute_build(&build_conf)?;
+
             if let Some(r) = res_build.status.code() && r != 0 {
                 return end(&res_build)
             }
