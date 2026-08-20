@@ -1,6 +1,6 @@
-use std::{collections::{VecDeque, vec_deque}, fs::{self, read_dir}, io::{self, ErrorKind::AlreadyExists, Read, Write}, time::UNIX_EPOCH};
+use std::{collections::VecDeque, fs, io::{self, ErrorKind::AlreadyExists, Write}, time::UNIX_EPOCH};
 
-use crate::config::{Config, ConfigError};
+use crate::config::ConfigError;
 
 pub const RM_CACHE: &str = ".rm_cache";
 pub const INCREM_FILE: &str = "incremental.cache";
