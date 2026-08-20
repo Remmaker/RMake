@@ -1,3 +1,4 @@
 /target
 TODO
 *.lock
+.rm_cache

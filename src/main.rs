@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod run;
 mod build;
+mod cache;
 
 fn main() {
     if let Err(err) = cli::run() {

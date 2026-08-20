@@ -1,6 +1,7 @@
 use crate::config::*;
 use crate::build::*;
 use crate::run::*;
+use crate::cache::*;
 
 fn help() {
     println!(
@@ -10,7 +11,7 @@ fn help() {
 Usage
   rmake                 → build (search for the first ".rm" file in the cwd and execute build section)
   rmake file | file.rm  → build using provided config file
-  rmake run             → execute run section (without rebuild)
+  rmake run             → execute run section
   rmake help            → show this
 "#);
 }
@@ -44,7 +45,9 @@ pub fn run() -> Result<i32, ConfigError>{
     let rmake_arg: Vec<String> = std::env::args().collect();
     let mut path_build_file: String = String::new();
     let mut should_build = false;
-    
+    let mut should_run = false;
+
+    cache_create(false)?;
     match rmake_arg.get(1).map(|s| s.as_str()) {
         Some("run") => {
             if let Some(second) = rmake_arg.get(2) {
@@ -53,12 +56,12 @@ pub fn run() -> Result<i32, ConfigError>{
             } else {
                 path_build_file = find_first_rm()?;
             }
-
+            should_run = true;
         },
-        Some("watch") => { todo!() },
         Some("help") => { help(); return Ok(0) },
+        Some("clean") => { return cache_clean() },
         Some(file) if file_is_conf(file)? => { path_build_file = file.to_string(); should_build = true },
-        None => { path_build_file = find_first_rm()?; should_build = true },
+        Some("") | None => { path_build_file = find_first_rm()?; should_build = true },
         _ => { eprintln!("UNREACHABLE") }
     }
 
@@ -71,12 +74,25 @@ pub fn run() -> Result<i32, ConfigError>{
     let res_build: CmdOutput;
     check_for_config_requirement(&config)?;
 
-    let build_conf = parse_build(&config)?;
-    
+    let mut build_conf = parse_build(&config)?;
+    let ccache = cache_get_current()?;
+    let scache = cache_compute_src(build_conf.src.clone())?;
+
     if should_build {
-       res_build = execute_build(&build_conf)?;
-       end(&res_build)
-    } else {
+        let src_to_build = cache_compute_diff(build_conf.src.clone(), scache.clone(), ccache)?;
+        
+        build_conf.src = src_to_build;
+        res_build = execute_build(&build_conf)?;
+
+        if let Some(v) = res_build.status.code() {
+            if v == 0 {
+                cache_update(scache)?;
+            }
+        }
+        return end(&res_build)
+    } 
+
+    if should_run {
         let run_conf = parse_run(&config)?;
         if run_conf.rebuild {
             res_build = execute_build(&build_conf)?;
@@ -85,6 +101,8 @@ pub fn run() -> Result<i32, ConfigError>{
             }
         }
         res_run = execute_run(&run_conf)?;
-        end(&res_run)
+        return end(&res_run)
     }
+
+    Err(ConfigError::FileNotFound {message: "Unexpected".into()})
 }

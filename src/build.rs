@@ -1,12 +1,14 @@
 use std::ffi::OsStr;
 use std::fs;
+use std::process::ExitStatus;
 use crate::config::*;
+use crate::cache::*;
 
 #[derive(Default, Debug)]
 pub struct BuildConfig {
     compiler: String,
     flags: Option<Vec<String>>,
-    src: Vec<String>,
+    pub src: Vec<String>,
     include: Option<Vec<String>>,
     lflags: Option<Vec<String>>,
     lpaths: Option<Vec<String>>,
@@ -84,15 +86,25 @@ pub fn parse_build(conf: &Config) -> Result<BuildConfig, ConfigError> {
     }
     
     build_conf.src = parse_glob_src(build_conf.src);
+    build_conf.flags.get_or_insert_with(Vec::new).push("-c".to_string());
+    for s in build_conf.src.clone() {
+        cache_build_obj_path(s)?;
+    }
     
     Ok(build_conf)
 }
 
 pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
+    if conf.src.len() == 0 {
+        return Ok(CmdOutput { stdout: "RMake cache: Nothing to do".into(), stderr: "".into(), status: ExitStatus::default() })
+    }
+
     let compiler = conf.compiler.clone();
     let is_cl = compiler.ends_with("cl") || compiler.ends_with("cl.exe");
 
-    let mut cmd = std::process::Command::new(compiler.clone());
+    for s in conf.src.clone() {
+        let mut cmd = std::process::Command::new(conf.compiler.clone());
+        let norm_src = s.clone().replace("\\", "/");
         cmd.args(conf.flags.clone().get_or_insert_with(Vec::new).iter()
             .map(|s| if !is_cl {
                 if s.starts_with("--") {
@@ -102,36 +114,62 @@ pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
                 }
             } else { s.to_string() }))
         
-        .args(conf.include.clone().get_or_insert_with(Vec::new).iter()
-            .map(|s| if !is_cl { format!("-I{s}") } else { format!("/I {s}")}))
+            .args(conf.include.clone().get_or_insert_with(Vec::new).iter()
+                .map(|s| if !is_cl { format!("-I{s}") } else { format!("/I {s}")}))
+            
+            .arg(norm_src.clone())
+            .arg("-o")
+            .arg(format!("{}{}.o", cache_get_obj_path(), norm_src));
+
+        let args: Vec<&OsStr> = cmd.get_args().collect();
+        let mut cmdstr: String = compiler.clone();
+        for arg in args {
+            if let Some(a) = arg.to_str() {
+                cmdstr += format!(" {}", a).as_str();      
+            }
+        }
+
+        eprintln!("RMake: {}", cmdstr);
+        let output = cmd.output()
+            .map_err(|_| ConfigError::CommandFailed { cmd: cmdstr.clone(), message: "Unexpected".into() })?;
         
-        .args(conf.src.iter())
+        if let Some(code) = output.status.code() {
+            if code != 0 {
+                return Err(ConfigError::CommandFailed { 
+                    cmd: cmdstr, 
+                    message: format!("stdout:{}\nstderr{}\nexit:{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr), code) 
+                });
+            }
+        }
         
-        .arg(if !is_cl { "-o" } else { "/o" }) 
-        
-        .arg(conf.target.clone()) 
-        
-        .args(conf.lpaths.clone().get_or_insert_with(Vec::new).iter()
-            .map(|s| if !is_cl { format!("-L{s}") } else { format!("/L {s}") }))
-        
-        .args(conf.lflags.clone().get_or_insert_with(Vec::new).iter() 
-            .map(|s| if !is_cl { format!("-{}", s.trim_start_matches('-')) } else { s.to_string() }));
+    }
+
+    let obj_files = cache_get_all_obj()?;
     
+    let mut cmd = std::process::Command::new(conf.compiler.clone());
+    cmd.args(obj_files.iter());
+    cmd.arg("-o");
+    cmd.arg(conf.target.clone());
+
+    if let Some(lpaths) = conf.lpaths.clone() && lpaths.len() > 0 {
+        cmd.arg("-L");
+        cmd.args(lpaths.iter());
+    }
+    
+    cmd.args(conf.lflags.clone().get_or_insert(Vec::new()).iter());
+
     let args: Vec<&OsStr> = cmd.get_args().collect();
-    let mut cmdstr: String = compiler;
+    let mut cmdstr: String = compiler.clone();
     for arg in args {
         if let Some(a) = arg.to_str() {
             cmdstr += format!(" {}", a).as_str();      
         }
     }
     eprintln!("RMake: {}", cmdstr);
+
     let output = cmd.output()
-                    .map_err(|_| ConfigError::CommandFailed { cmd: conf.compiler.clone(), message: "Unexpected".into() })?;
-    let tmp: CmdOutput = CmdOutput { 
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(), 
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(), 
-        status: output.status 
-    };
-    Ok(tmp)
+            .map_err(|_| ConfigError::CommandFailed { cmd: cmdstr.clone(), message: "Unexpected".into() })?;
+
+    Ok(CmdOutput { stdout: String::from_utf8_lossy(&output.stdout).into(), stderr: String::from_utf8_lossy(&output.stderr).into(), status: output.status })
 }
 

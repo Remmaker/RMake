@@ -27,7 +27,7 @@ build
 run
 {
     target=${myvar}
-    rebuild=t | f | true | false
+    rebuild=true | false
 }
 ```
 
