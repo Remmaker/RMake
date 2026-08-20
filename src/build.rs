@@ -133,25 +133,27 @@ pub fn build_obj_file(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
 
 pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
     if conf.src.len() == 0 {
-        return Ok(CmdOutput { stdout: "RMake cache: Nothing to do".into(), stderr: "".into(), status: ExitStatus::default() })
+        if fs::exists(conf.target.clone()).unwrap_or(false) {
+            return Ok(CmdOutput { stdout: "RMake cache: Nothing to do".into(), stderr: "".into(), status: ExitStatus::default() })
+        } else {
+            return build_obj_file(conf);
+        }
     }
 
     let compiler = conf.compiler.clone();
-    let is_cl = compiler.ends_with("cl") || compiler.ends_with("cl.exe");
 
     for s in conf.src.clone() {
         let mut cmd = std::process::Command::new(conf.compiler.clone());
         cmd.args(conf.flags.clone().get_or_insert_with(Vec::new).iter()
-            .map(|s| if !is_cl {
+            .map(|s| 
                 if s.starts_with("--") {
                     s.to_string()
                 } else {
                     format!("-{}", s.trim_start_matches('-'))
-                }
-            } else { s.to_string() }))
+                }))
         
             .args(conf.include.clone().get_or_insert_with(Vec::new).iter()
-                .map(|s| if !is_cl { format!("-I{s}") } else { format!("/I {s}")}))
+                .map(|s| format!("-I{s}")))
             
             .arg(s.clone())
             .arg("-o")
