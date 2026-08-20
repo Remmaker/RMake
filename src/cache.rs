@@ -14,9 +14,7 @@ pub fn cache_get_obj_path() -> String {
     RM_CACHE.to_owned() + "/" + OBJ_FOLDER + "/"
 }
 
-pub fn cache_build_obj_path(mut s: String) -> Result<(), ConfigError> {
-    s = s.replace("\\", "/");
-    
+pub fn cache_build_obj_path(s: String) -> Result<(), ConfigError> {    
     let resopt = s.rsplit_once("/"); 
     if let Some(p) = resopt {
         let respath = p.0.to_string();
@@ -24,7 +22,7 @@ pub fn cache_build_obj_path(mut s: String) -> Result<(), ConfigError> {
         
         if let Some(reserr) = res.err() {
             if reserr.kind() != AlreadyExists {
-                return Err(ConfigError::CommandFailed { cmd:"Create cache".into(), message: "Failed to create rmake cache directory".into() });
+                return Err(ConfigError::CommandFailed { cmd:"Create cache".into(), message: "Failed to create rmake cache directory for".into() });
             }
         }
     }
@@ -141,7 +139,7 @@ pub fn cache_get_current() -> Result<CacheMetadata, ConfigError> {
 
 pub fn cache_compute_src(src: Vec<String>) -> Result<CacheMetadata, ConfigError> {
     let mut ret: CacheMetadata = CacheMetadata::default();
-    
+
     for dat in src {
         let file = fs::File::open(dat.clone())
         .map_err(|_| ConfigError::CommandFailed { cmd: "Open file".into(), message: format!("Failed to open file {}", dat) })?;
@@ -167,13 +165,20 @@ pub fn cache_compute_diff(src: Vec<String>, srccache: CacheMetadata, cached: Cac
     if cached.map.len() == 0 { return Ok(src); }
 
     for src in src {
-        if cached.map.contains_key(&src) {
-            if let Some(cvalue) = cached.map.get(&src.clone()) && let Some(svalue) = srccache.map.get(&src.clone()) {
-                if cvalue.mtime != svalue.mtime || cvalue.size != svalue.size {
+        if let Some(cvalue) = cached.map.get(&src.clone()) && let Some(svalue) = srccache.map.get(&src.clone()) {
+            if cvalue.mtime != svalue.mtime || cvalue.size != svalue.size {
+                ret.push(src);
+            } else {
+                let mut respath = cache_get_obj_path();
+                respath += &src;
+                respath += ".o";
+                if let Ok(r) = fs::exists(respath) {
+                    if !r {
+                        ret.push(src);
+                    }
+                } else {
                     ret.push(src);
                 }
-            } else {
-                ret.push(src);
             }
         } else {
             ret.push(src);

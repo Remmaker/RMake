@@ -86,12 +86,49 @@ pub fn parse_build(conf: &Config) -> Result<BuildConfig, ConfigError> {
     }
     
     build_conf.src = parse_glob_src(build_conf.src);
+
+    let mut tmp:Vec<String> = Vec::new();
+    for s in build_conf.src {
+        tmp.push(s.replace("\\", "/"));
+    }
+    build_conf.src = tmp;
+    
     build_conf.flags.get_or_insert_with(Vec::new).push("-c".to_string());
     for s in build_conf.src.clone() {
         cache_build_obj_path(s)?;
     }
     
     Ok(build_conf)
+}
+
+pub fn build_obj_file(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
+    let obj_files = cache_get_all_obj()?;
+    
+    let mut cmd = std::process::Command::new(conf.compiler.clone());
+    cmd.args(obj_files.iter());
+    cmd.arg("-o");
+    cmd.arg(conf.target.clone());
+
+    if let Some(lpaths) = conf.lpaths.clone() && lpaths.len() > 0 {
+        cmd.args(lpaths.iter()
+                .map(|s| format!("-L{s}")));
+    }
+
+    cmd.args(conf.lflags.clone().get_or_insert(Vec::new()).iter());
+
+    let args: Vec<&OsStr> = cmd.get_args().collect();
+    let mut cmdstr: String = conf.compiler.clone();
+    for arg in args {
+        if let Some(a) = arg.to_str() {
+            cmdstr += format!(" {}", a).as_str();      
+        }
+    }
+    eprintln!("RMake: {}", cmdstr);
+
+    let output = cmd.output()
+            .map_err(|_| ConfigError::CommandFailed { cmd: cmdstr.clone(), message: "Unexpected".into() })?;
+
+    Ok(CmdOutput { stdout: String::from_utf8_lossy(&output.stdout).into(), stderr: String::from_utf8_lossy(&output.stderr).into(), status: output.status })
 }
 
 pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
@@ -104,7 +141,6 @@ pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
 
     for s in conf.src.clone() {
         let mut cmd = std::process::Command::new(conf.compiler.clone());
-        let norm_src = s.clone().replace("\\", "/");
         cmd.args(conf.flags.clone().get_or_insert_with(Vec::new).iter()
             .map(|s| if !is_cl {
                 if s.starts_with("--") {
@@ -117,9 +153,9 @@ pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
             .args(conf.include.clone().get_or_insert_with(Vec::new).iter()
                 .map(|s| if !is_cl { format!("-I{s}") } else { format!("/I {s}")}))
             
-            .arg(norm_src.clone())
+            .arg(s.clone())
             .arg("-o")
-            .arg(format!("{}{}.o", cache_get_obj_path(), norm_src));
+            .arg(format!("{}{}.o", cache_get_obj_path(), s));
 
         let args: Vec<&OsStr> = cmd.get_args().collect();
         let mut cmdstr: String = compiler.clone();
@@ -144,32 +180,6 @@ pub fn execute_build(conf: &BuildConfig) -> Result<CmdOutput, ConfigError> {
         
     }
 
-    let obj_files = cache_get_all_obj()?;
-    
-    let mut cmd = std::process::Command::new(conf.compiler.clone());
-    cmd.args(obj_files.iter());
-    cmd.arg("-o");
-    cmd.arg(conf.target.clone());
-
-    if let Some(lpaths) = conf.lpaths.clone() && lpaths.len() > 0 {
-        cmd.arg("-L");
-        cmd.args(lpaths.iter());
-    }
-    
-    cmd.args(conf.lflags.clone().get_or_insert(Vec::new()).iter());
-
-    let args: Vec<&OsStr> = cmd.get_args().collect();
-    let mut cmdstr: String = compiler.clone();
-    for arg in args {
-        if let Some(a) = arg.to_str() {
-            cmdstr += format!(" {}", a).as_str();      
-        }
-    }
-    eprintln!("RMake: {}", cmdstr);
-
-    let output = cmd.output()
-            .map_err(|_| ConfigError::CommandFailed { cmd: cmdstr.clone(), message: "Unexpected".into() })?;
-
-    Ok(CmdOutput { stdout: String::from_utf8_lossy(&output.stdout).into(), stderr: String::from_utf8_lossy(&output.stderr).into(), status: output.status })
+    build_obj_file(conf)
 }
 
