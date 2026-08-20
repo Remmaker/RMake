@@ -36,8 +36,6 @@ pub fn parse_run(conf: &Config) -> Result<RunConfig, ConfigError> {
                 run_conf.rebuild = match v.as_str() {
                     "true"  => true,
                     "false" => false,
-                    "t"     => true,
-                    "f"     => false,
                     _       => false
                 }
             },
