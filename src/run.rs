@@ -14,7 +14,7 @@ pub fn parse_run(conf: &Config) -> Result<RunConfig, ConfigError> {
     let target = hash_run.unwrap();
 
     if !target.contains_key("target") {
-        return Err(ConfigError::InvalidConfig { message: "Missing target section".into()  })
+        return Err(ConfigError::InvalidConfig { message: "Missing target argument in RUN section".into()  })
     }
 
 

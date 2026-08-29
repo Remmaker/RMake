@@ -102,6 +102,8 @@ pub fn run() -> Result<i32, ConfigError>{
 
             if let Some(r) = res_build.status.code() && r != 0 {
                 return end(&res_build)
+            } else {
+                cache_update(scache)?;
             }
         }
         res_run = execute_run(&run_conf)?;
