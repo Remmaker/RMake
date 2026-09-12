@@ -94,6 +94,9 @@ pub fn parse_build(conf: &Config) -> Result<BuildConfig, ConfigError> {
     build_conf.src = tmp;
     
     build_conf.flags.get_or_insert_with(Vec::new).push("-c".to_string());
+    build_conf.flags.get_or_insert_with(Vec::new).push("-MMD".to_string());
+    build_conf.flags.get_or_insert_with(Vec::new).push("-MP".to_string());
+
     for s in build_conf.src.clone() {
         cache_build_obj_path(s)?;
     }

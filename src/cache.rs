@@ -48,7 +48,9 @@ pub fn cache_get_all_obj() -> Result<Vec<String>, ConfigError> {
                                 }
                             } else if file_type.is_file() {
                                 if let Some(filepath) = entry.path().to_str() {
-                                    ret.push(filepath.to_string().replace("\\", "/"));
+                                    if filepath.ends_with(".o") {
+                                        ret.push(filepath.to_string().replace("\\", "/"));
+                                    }
                                 }
                             }
                         } else {
@@ -160,20 +162,80 @@ pub fn cache_compute_src(src: Vec<String>) -> Result<CacheMetadata, ConfigError>
     Ok(ret)
 }
 
+fn cache_get_modified_seconds(path: &str) -> Result<u64, ConfigError> {
+    let file = fs::File::open(path)
+        .map_err(|_| ConfigError::CommandFailed { cmd: "Open file".into(), message: format!("Failed to open file {}", path) })?;
+    let meta = file.metadata().map_err(|_| ConfigError::InvalidConfig { message: "TODO THIS ERROR #ER1:".into() } )?;
+    let tmp =  meta.modified().map_err(|_| ConfigError::InvalidConfig { message: "TODO THIS ERROR #ER2".into() })?;
+    let seconds = tmp
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs(); 
+
+    Ok(seconds)
+}
+
+fn cache_parse_d_datas(datas: String) -> Result<Vec<String>, ConfigError> {
+    let mut ret: Vec<String> = Vec::new();
+
+    if let Some(first_line) = datas.lines().next() {
+        if let Some((byte_index, _)) = first_line.match_indices(' ').nth(1) {
+            let remainder = &first_line[byte_index + 1..];
+            ret.push(remainder.to_string().split(" ").collect());
+        }
+    }
+
+    Ok(ret)
+}
+
+fn cache_is_dependency_modified(src: &str) -> Result<bool, ConfigError> {
+    let mut path = cache_get_obj_path();
+    path += &src;
+    path += ".d";
+
+    let mut base = cache_get_obj_path();
+    base += &src;
+    base += ".o";
+
+    let basetime = cache_get_modified_seconds(&base)?;
+
+    if let Ok(r) = fs::exists(&path) {
+        if !r {
+            return Ok(true);
+        }
+    } else {
+        return Ok(true);
+    }
+
+
+    let datas = fs::read_to_string(path).map_err(|_| ConfigError::CommandFailed { cmd: "read_to_string".into(), message: "Unexpected".into() })?;
+    let vdatas = cache_parse_d_datas(datas)?;
+    for v in vdatas {
+        if basetime < cache_get_modified_seconds(&v)? {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
 pub fn cache_compute_diff(src: Vec<String>, srccache: CacheMetadata, cached: CacheMetadata) -> Result<Vec<String>, ConfigError> {
     let mut ret: Vec<String> = Vec::new();
     if cached.map.len() == 0 { return Ok(src); }
+    let cache_path: String = cache_get_obj_path();
 
     for src in src {
         if let Some(cvalue) = cached.map.get(&src.clone()) && let Some(svalue) = srccache.map.get(&src.clone()) {
             if cvalue.mtime != svalue.mtime || cvalue.size != svalue.size {
                 ret.push(src);
             } else {
-                let mut respath = cache_get_obj_path();
+                let mut respath = cache_path.clone();
                 respath += &src;
                 respath += ".o";
                 if let Ok(r) = fs::exists(respath) {
                     if !r {
+                        ret.push(src);
+                    } else if cache_is_dependency_modified(&src)? {
                         ret.push(src);
                     }
                 } else {

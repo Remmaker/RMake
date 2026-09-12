@@ -5,7 +5,7 @@
 #include <iostream>
 
 void test_hello_rmake() {
-    std::cout << "Hello from rmake make" << std::endl;
+    std::cout << "Hello from rmake" << std::endl;
 }
 
 #endif
