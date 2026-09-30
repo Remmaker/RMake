@@ -164,7 +164,7 @@ pub fn cache_compute_src(src: Vec<String>) -> Result<CacheMetadata, ConfigError>
 
 fn cache_get_modified_seconds(path: &str) -> Result<u64, ConfigError> {
     let file = fs::File::open(path)
-        .map_err(|_| ConfigError::CommandFailed { cmd: "Open file".into(), message: format!("Failed to open file {}", path) })?;
+        .map_err(|_| ConfigError::CommandFailed { cmd: "Open file".into(), message: format!("Failed to open file {} in cache_get_modified_seconds", path) })?;
     let meta = file.metadata().map_err(|_| ConfigError::InvalidConfig { message: "TODO THIS ERROR #ER1:".into() } )?;
     let tmp =  meta.modified().map_err(|_| ConfigError::InvalidConfig { message: "TODO THIS ERROR #ER2".into() })?;
     let seconds = tmp
@@ -177,13 +177,38 @@ fn cache_get_modified_seconds(path: &str) -> Result<u64, ConfigError> {
 
 fn cache_parse_d_datas(datas: String) -> Result<Vec<String>, ConfigError> {
     let mut ret: Vec<String> = Vec::new();
+    let mut first_line: bool = true;
+    let mut lines = datas.lines();
+    
+    while let Some(current_line) = lines.next() {
+        let mut rret: String;
+        if first_line && let Some((byte_index, _)) = current_line.match_indices(' ').nth(1) {
+            let remainder = &current_line[byte_index + 1..].to_string();
+            rret = remainder.clone();
+            if let Some((idx_rm, _)) = remainder.match_indices('\\').nth(0) {
+                rret.remove(idx_rm);
+            }
+            first_line = false;
+        } else {
+            if current_line.ends_with(":") {
+                break;
+            }
 
-    if let Some(first_line) = datas.lines().next() {
-        if let Some((byte_index, _)) = first_line.match_indices(' ').nth(1) {
-            let remainder = &first_line[byte_index + 1..];
-            ret.push(remainder.to_string().split(" ").collect());
+            rret = current_line.to_string().clone();
+            if let Some((idx_rm, _)) = current_line.match_indices('\\').nth(0) {
+                rret.remove(idx_rm);
+            }
         }
-    }
+    
+        let vr: Vec<&str> = rret.split(" ").collect();
+        let mut to_ext: Vec<&str> = Vec::new();
+        for v in vr {
+            if !v.is_empty() {
+                to_ext.push(v);
+            }
+        } 
+        ret.extend(to_ext.iter().map(|v| v.trim().to_string()));
+    }    
 
     Ok(ret)
 }

@@ -9,7 +9,7 @@ void print_args(int argc, char* argv[]) {
 
 int main(int argc, char* argv[])
 {
-    printf("modified\n");
+    printf("modified D\n");
     print_args(argc, argv);
     test_hello_rmake();
     return 0;
