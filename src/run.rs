@@ -66,9 +66,11 @@ pub fn execute_run(run_conf: &RunConfig) -> Result<CmdOutput, ConfigError> {
     let mut clonarg = run_conf.args.clone();
     let args = clonarg.get_or_insert("".into()).split_whitespace().map(|s| s.to_string());
     
+    eprint!("{}", binary);
     let cmd = std::process::Command::new(binary)
         .args(args)
         .output().map_err(|_| ConfigError::CommandFailed { cmd: run_conf.target.clone(), message: "Failed to run target".into() })?;
+
     let cmdoutput: CmdOutput = CmdOutput { 
         stdout: String::from_utf8_lossy(&cmd.stdout).to_string(),
         stderr: String::from_utf8_lossy(&cmd.stderr).to_string(),

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, process::ExitStatus};
 
+#[derive(Debug)]
 pub enum ConfigError {
     InvalidSyntax { line: usize, message: String },
     FileNotFound { message: String },

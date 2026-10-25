@@ -68,7 +68,7 @@ pub fn cache_get_all_obj() -> Result<Vec<String>, ConfigError> {
 #[derive(Default, Hash, Clone)]
 struct CacheData {
     size: u64,
-    mtime: u64,
+    mtime: u128,
 }
 #[derive(Default, Clone)]
 pub struct CacheMetadata {
@@ -131,7 +131,7 @@ pub fn cache_get_current() -> Result<CacheMetadata, ConfigError> {
         }
 
         let name  = line[0].to_string();
-        let mtime = line[1].parse::<u64>().map_err(|_| ConfigError::CommandFailed { cmd: "Cast".into(), message: format!("Failed to cast {} in u64 for second parameter at line {}", line[1], count) })?;
+        let mtime = line[1].parse::<u128>().map_err(|_| ConfigError::CommandFailed { cmd: "Cast".into(), message: format!("Failed to cast {} in u64 for second parameter at line {}", line[1], count) })?;
         let size = line[2].parse::<u64>().map_err(|_| ConfigError::CommandFailed { cmd: "Cast".into(), message: format!("Failed to cast {} in u64 for third parameter at line {}", line[2], count) })?;
         metavec.map.insert(name, CacheData { size: size, mtime: mtime });
     }
@@ -150,7 +150,7 @@ pub fn cache_compute_src(src: Vec<String>) -> Result<CacheMetadata, ConfigError>
         let seconds = tmp
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_secs(); 
+            .as_millis(); 
     
         let mtime =  seconds;
         let name = dat;
@@ -162,7 +162,7 @@ pub fn cache_compute_src(src: Vec<String>) -> Result<CacheMetadata, ConfigError>
     Ok(ret)
 }
 
-fn cache_get_modified_seconds(path: &str) -> Result<u64, ConfigError> {
+fn cache_get_modified_seconds(path: &str) -> Result<u128, ConfigError> {
     let file = fs::File::open(path)
         .map_err(|_| ConfigError::CommandFailed { cmd: "Open file".into(), message: format!("Failed to open file {} in cache_get_modified_seconds", path) })?;
     let meta = file.metadata().map_err(|_| ConfigError::InvalidConfig { message: "TODO THIS ERROR #ER1:".into() } )?;
@@ -170,7 +170,7 @@ fn cache_get_modified_seconds(path: &str) -> Result<u64, ConfigError> {
     let seconds = tmp
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
-        .as_secs(); 
+        .as_millis(); 
 
     Ok(seconds)
 }
@@ -182,11 +182,15 @@ fn cache_parse_d_datas(datas: String) -> Result<Vec<String>, ConfigError> {
     
     while let Some(current_line) = lines.next() {
         let mut rret: String;
-        if first_line && let Some((byte_index, _)) = current_line.match_indices(' ').nth(1) {
-            let remainder = &current_line[byte_index + 1..].to_string();
-            rret = remainder.clone();
-            if let Some((idx_rm, _)) = remainder.match_indices('\\').nth(0) {
-                rret.remove(idx_rm);
+        if first_line {
+            if  let Some((byte_index, _)) = current_line.match_indices(' ').nth(1) {
+                let remainder = &current_line[byte_index + 1..].to_string();
+                rret = remainder.clone();
+                if let Some(striped) = rret.trim_end().strip_suffix("\\") {
+                    rret = striped.to_string();
+                }
+            } else {
+                break;
             }
             first_line = false;
         } else {
@@ -195,8 +199,8 @@ fn cache_parse_d_datas(datas: String) -> Result<Vec<String>, ConfigError> {
             }
 
             rret = current_line.to_string().clone();
-            if let Some((idx_rm, _)) = current_line.match_indices('\\').nth(0) {
-                rret.remove(idx_rm);
+            if let Some(striped) = rret.trim_end().strip_suffix("\\") {
+                rret = striped.to_string();
             }
         }
     
@@ -236,9 +240,15 @@ fn cache_is_dependency_modified(src: &str) -> Result<bool, ConfigError> {
     let datas = fs::read_to_string(path).map_err(|_| ConfigError::CommandFailed { cmd: "read_to_string".into(), message: "Unexpected".into() })?;
     let vdatas = cache_parse_d_datas(datas)?;
     for v in vdatas {
-        if basetime < cache_get_modified_seconds(&v)? {
+        let modified = cache_get_modified_seconds(&v);
+        if modified.is_err() {
             return Ok(true);
         }
+        if let Ok(modi) = modified {
+            if basetime <= modi {
+                return Ok(true);
+            }    
+        } 
     }
 
     Ok(false)
@@ -286,4 +296,43 @@ pub fn cache_update(srccache: CacheMetadata) -> Result<(), ConfigError> {
     }
 
     Ok(())
+}
+
+
+// Test 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_cache_parse_d_datas_dummy_dependency() -> Result<(), ConfigError> {
+          let d = "\
+.rm_cache/obj/src/game.cpp.o: src/game.cpp src/include/game.hpp \\
+ src/include/stack.hpp
+src/include/game.hpp:
+src/include/stack.hpp:
+";
+
+        // Act
+        let deps = cache_parse_d_datas(d.into())?;
+
+        // Assert — only header dependency for the file
+        assert_eq!(deps, vec!["src/include/game.hpp", "src/include/stack.hpp"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_cache_parse_d_datas_no_dependency() -> Result<(), ConfigError> {
+          let d = "\
+.rm_cache/obj/src/game.cpp.o: src/game.cpp
+src/include/game.hpp:
+src/include/stack.hpp:
+";
+
+        // Act
+        let deps = cache_parse_d_datas(d.into())?;
+
+        // Assert — Nothings in deps
+        assert_eq!(deps, Vec::<String>::new());
+        Ok(())
+    }
 }
